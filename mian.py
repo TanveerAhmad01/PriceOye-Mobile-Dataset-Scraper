@@ -2,90 +2,96 @@ import requests
 from bs4 import BeautifulSoup
 import re
 import pandas as pd
+import time
 
-header = {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/117.0.0.0 Safari/537.36"
-}
+class MobileScraper:
+    def __init__(self, base_url, max_pages):
+        self.base_url = base_url
+        self.max_pages = max_pages
+        self.title_list = []
+        self.rating_list = []
+        self.reviews_list = []
+        self.discount_price_list = []
+        self.original_price_list = []
+        self.off_on_every_mobile_list = []
+        self.header = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/117.0.0.0 Safari/537.36"
+        }
 
-base_url = 'https://priceoye.pk/mobiles'
+    def scrape(self):
+        for i in range(1, self.max_pages + 1):
+            page_url = f'{self.base_url}?page={i}'
+            response = requests.get(page_url, headers=self.header)
+            soup = BeautifulSoup(response.text, 'html.parser')
+            
+            main_content = soup.find('div', class_="product-list")
+            content = main_content.find_all('div', 'productBox b-productBox')
+            
+            print(f"Scraping {len(content)} products from: {page_url}")
+            
+            for product in content:
+                self.extract_product_data(product)
 
+            time.sleep(2)
 
-counter = 1
-maxRange = 23
-
-
-titleList = []
-ratingList = []
-reviewsList = []
-discountPriceList = []
-originalPriceList = []
-offOnEveryMobileList = []
-
-for i in range(counter, maxRange + 1):
-    pageUrl = f'{base_url}?page={i}'
-    response = requests.get(pageUrl, headers=header)
-    soup = BeautifulSoup(response.text, 'html.parser')
-    
-    mainContent = soup.find('div', class_="product-list")
-    content = mainContent.find_all('div', 'productBox b-productBox')
-    
-    print(f"Scraping {len(content)} products from: {pageUrl}")
-    
-    for product in content:
+    def extract_product_data(self, product):
         # Title
         title = product.find('div', class_='p-title bold h5')
-        titleList.append(title.text.strip() if title else None)
+        self.title_list.append(title.text.strip() if title else None)
         
         # Rating
         rating = product.find('span', class_='h6 bold')
-        ratingList.append(rating.text.strip() if rating else None)
+        self.rating_list.append(rating.text.strip() if rating else None)
         
         # Reviews
         review = product.find('span', class_='rating-h7 bold')
         if review:
             number = re.search(r'\d+', review.text) 
-            reviewsList.append(number.group() if number else None)
+            self.reviews_list.append(number.group() if number else None)
         else:
-            reviewsList.append(None)
+            self.reviews_list.append(None)
         
         # Discount Price
-        discountPrice = product.find('div', class_='price-box p1')
-        if discountPrice:
-            number = re.search(r'\d+', discountPrice.text)
-            discountPriceList.append(number.group() if number else None)
+        discount_price = product.find('div', class_='price-box p1')
+        if discount_price:
+            number = re.search(r'\d+', discount_price.text)
+            self.discount_price_list.append(number.group() if number else None)
         else:
-            discountPriceList.append(None)
+            self.discount_price_list.append(None)
         
         # Original Price
-        originalPrice = product.find('div', class_='price-diff-retail')
-        if originalPrice:
-            number = re.search(r'\d+', originalPrice.text)
-            originalPriceList.append(number.group() if number else None)
+        original_price = product.find('div', class_='price-diff-retail')
+        if original_price:
+            number = re.search(r'\d+', original_price.text)
+            self.original_price_list.append(number.group() if number else None)
         else:
-            originalPriceList.append(None)
+            self.original_price_list.append(None)
         
         # Discount Percentage
         discount = product.find('div', class_='price-diff-saving')
         if discount:
             number = re.search(r'\d+', discount.text)
-            offOnEveryMobileList.append(number.group() if number else None)
+            self.off_on_every_mobile_list.append(number.group() if number else None)
         else:
-            offOnEveryMobileList.append(None)
+            self.off_on_every_mobile_list.append(None)
+
+    def save_to_csv(self, filename):
+        df = pd.DataFrame({
+            'Title': self.title_list,
+            'Rating': self.rating_list,
+            'Reviews': self.reviews_list,
+            'Discount Price': self.discount_price_list,
+            'Original Price': self.original_price_list,
+            'Off': self.off_on_every_mobile_list
+        })
+        
+        df.to_csv(filename, index=False)
+        print(f"\nData saved to {filename}")
+        df
 
 
-df = pd.DataFrame({
-    'Title': titleList,
-    'Rating': ratingList,
-    'Reviews': reviewsList,
-    'Discount Price': discountPriceList,
-    'Original Price': originalPriceList,
-    'Off': offOnEveryMobileList
-})
-
-
-print("\nScraped Data:")
-print(df.head())
-
-
-df.to_csv('mobiles_data.csv', index=False)
-print("\nData saved to mobiles_data.csv")
+base_url = 'https://priceoye.pk/mobiles'
+max_pages = 23
+obj = MobileScraper(base_url, max_pages)
+obj.scrape()
+obj.save_to_csv('mobiles_data.csv')

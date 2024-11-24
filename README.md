@@ -1,3 +1,0 @@
-# PriceOye-Mobile-Dataset-Scraper 
-
-
